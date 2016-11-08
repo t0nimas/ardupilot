@@ -1,9 +1,6 @@
-/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
+#pragma once
 
-#ifndef __AP_HAL_PX4_ANALOGIN_H__
-#define __AP_HAL_PX4_ANALOGIN_H__
-
-#include <AP_HAL_PX4.h>
+#include "AP_HAL_PX4.h"
 #include <pthread.h>
 #include <uORB/uORB.h>
 
@@ -14,7 +11,7 @@
 // these are virtual pins that read from the ORB
 #define PX4_ANALOG_ORB_BATTERY_VOLTAGE_PIN     100
 #define PX4_ANALOG_ORB_BATTERY_CURRENT_PIN     101
-#elif defined(CONFIG_ARCH_BOARD_PX4FMU_V2)
+#elif defined(CONFIG_ARCH_BOARD_PX4FMU_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4)
 #define PX4_ANALOG_VCC_5V_PIN                4
 #define PX4_ANALOG_ORB_SERVO_VOLTAGE_PIN       102
 #define PX4_ANALOG_ORB_SERVO_VRSSI_PIN         103
@@ -31,13 +28,15 @@ public:
     float voltage_latest();
     float voltage_average_ratiometric();
 
-    // stop pins not implemented on PX4 yet
-    void set_stop_pin(uint8_t p) {}
-    void set_settle_time(uint16_t settle_time_ms) {}
+    // implement stop pins
+    void set_stop_pin(uint8_t p);
+    void set_settle_time(uint16_t settle_time_ms) { _settle_time_ms = settle_time_ms; }
 
 private:
     // what pin it is attached to
     int16_t _pin;
+    int16_t _stop_pin;
+    uint16_t _settle_time_ms;
 
     // what value it has
     float _value;
@@ -53,7 +52,7 @@ private:
 class PX4::PX4AnalogIn : public AP_HAL::AnalogIn {
 public:
     PX4AnalogIn();
-    void init(void* implspecific);
+    void init();
     AP_HAL::AnalogSource* channel(int16_t pin);
     void _timer_tick(void);
     float board_voltage(void) { return _board_voltage; }
@@ -68,9 +67,15 @@ private:
     uint64_t _battery_timestamp;
     uint64_t _servorail_timestamp;
     PX4::PX4AnalogSource* _channels[PX4_ANALOG_MAX_CHANNELS];
+
+    // what pin is currently held low to stop a sonar from reading
+    uint8_t _current_stop_pin_i;
+    uint32_t _stop_pin_change_time;
+
     uint32_t _last_run;
     float _board_voltage;
     float _servorail_voltage;
     uint16_t _power_flags;
+
+    void next_stop_pin(void);
 };
-#endif // __AP_HAL_PX4_ANALOGIN_H__

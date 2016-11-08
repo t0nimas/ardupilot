@@ -1,25 +1,21 @@
-/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
+#pragma once
 
-#ifndef __AP_HAL_VRBRAIN_ANALOGIN_H__
-#define __AP_HAL_VRBRAIN_ANALOGIN_H__
-
-#include <AP_HAL_VRBRAIN.h>
+#include "AP_HAL_VRBRAIN.h"
 #include <pthread.h>
 #include <uORB/uORB.h>
 
 #define VRBRAIN_ANALOG_MAX_CHANNELS 16
 
 
-#if  defined(CONFIG_ARCH_BOARD_VRBRAIN_V4)
-// these are virtual pins that read from the ORB
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V45) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54)
 #define VRBRAIN_ANALOG_ORB_BATTERY_VOLTAGE_PIN     10
 #define VRBRAIN_ANALOG_ORB_BATTERY_CURRENT_PIN     11
-#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V5)
+#elif defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51)
 #define VRBRAIN_ANALOG_ORB_BATTERY_VOLTAGE_PIN     10
-#define VRBRAIN_ANALOG_ORB_BATTERY_CURRENT_PIN     11
-#elif defined(CONFIG_ARCH_BOARD_VRHERO_V1)
+#define VRBRAIN_ANALOG_ORB_BATTERY_CURRENT_PIN     -1
+#elif defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 #define VRBRAIN_ANALOG_ORB_BATTERY_VOLTAGE_PIN     10
-#define VRBRAIN_ANALOG_ORB_BATTERY_CURRENT_PIN     11
+#define VRBRAIN_ANALOG_ORB_BATTERY_CURRENT_PIN     1
 #endif
 
 class VRBRAIN::VRBRAINAnalogSource : public AP_HAL::AnalogSource {
@@ -33,13 +29,15 @@ public:
     float voltage_latest();
     float voltage_average_ratiometric();
 
-    // stop pins not implemented on VRBRAIN yet
-    void set_stop_pin(uint8_t p) {}
-    void set_settle_time(uint16_t settle_time_ms) {}
+    // implement stop pins
+    void set_stop_pin(uint8_t p);
+    void set_settle_time(uint16_t settle_time_ms) { _settle_time_ms = settle_time_ms; }
 
 private:
     // what pin it is attached to
     int16_t _pin;
+    int16_t _stop_pin;
+    uint16_t _settle_time_ms;
 
     // what value it has
     float _value;
@@ -55,7 +53,7 @@ private:
 class VRBRAIN::VRBRAINAnalogIn : public AP_HAL::AnalogIn {
 public:
     VRBRAINAnalogIn();
-    void init(void* implspecific);
+    void init();
     AP_HAL::AnalogSource* channel(int16_t pin);
     void _timer_tick(void);
     float board_voltage(void) { return _board_voltage; }
@@ -70,9 +68,15 @@ private:
     uint64_t _battery_timestamp;
     uint64_t _servorail_timestamp;
     VRBRAIN::VRBRAINAnalogSource* _channels[VRBRAIN_ANALOG_MAX_CHANNELS];
+
+    // what pin is currently held low to stop a sonar from reading
+    uint8_t _current_stop_pin_i;
+    uint32_t _stop_pin_change_time;
+
     uint32_t _last_run;
     float _board_voltage;
     float _servorail_voltage;
     uint16_t _power_flags;
+
+    void next_stop_pin(void);
 };
-#endif // __AP_HAL_VRBRAIN_ANALOGIN_H__

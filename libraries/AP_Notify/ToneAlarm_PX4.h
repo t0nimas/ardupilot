@@ -15,12 +15,14 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef __TONE_ALARM_PX4_H__
-#define __TONE_ALARM_PX4_H__
+#pragma once
 
-#include "ToneAlarm_PX4.h"
+#include "NotifyDevice.h"
 
-class ToneAlarm_PX4
+// wait 2 seconds before assuming a tone is done and continuing the continuous tone
+#define AP_NOTIFY_PX4_MAX_TONE_LENGTH_MS 2000
+
+class ToneAlarm_PX4: public NotifyDevice
 {
 public:
     /// init - initialised the tone alarm
@@ -29,21 +31,44 @@ public:
     /// update - updates led according to timed_updated.  Should be called at 50Hz
     void update();
 
+    // handle a PLAY_TUNE message
+    void handle_play_tune(mavlink_message_t *msg);
+    
 private:
     /// play_tune - play one of the pre-defined tunes
-    bool play_tune(const uint8_t tune_number);
+    void play_tone(const uint8_t tone_index);
+
+    // play_string - play tone specified by the provided string of notes
+    void play_string(const char *str);
+
+    // stop_cont_tone - stop playing the currently playing continuous tone
+    void stop_cont_tone();
+
+    // check_cont_tone - check if we should begin playing a continuous tone
+    void check_cont_tone();
 
     int _tonealarm_fd;      // file descriptor for the tone alarm
 
     /// tonealarm_type - bitmask of states we track
     struct tonealarm_type {
-        uint8_t armed              : 1;    // 0 = disarmed, 1 = armed
-        uint8_t failsafe_battery   : 1;    // 1 if battery failsafe
-        uint8_t gps_glitching      : 1;    // 1 if gps position is not good
-        uint8_t failsafe_gps       : 1;    // 1 if gps failsafe
-        uint8_t arming_failed      : 1;    // 0 = failing checks, 1 = passed
-        uint8_t parachute_release  : 1;    // 1 if parachute is being released
+        uint8_t armed                 : 1;    // 0 = disarmed, 1 = armed
+        uint8_t failsafe_battery      : 1;    // 1 if battery failsafe
+        uint8_t parachute_release     : 1;    // 1 if parachute is being released
+        uint8_t pre_arm_check         : 1;    // 0 = failing checks, 1 = passed
+        uint8_t failsafe_radio        : 1;    // 1 if radio failsafe
+        uint8_t vehicle_lost          : 1;    // 1 if lost copter tone requested
+        uint8_t compass_cal_running   : 1;    // 1 if compass calibration is running
+        uint8_t waiting_for_throw     : 1;    // 1 if waiting for copter throw launch
     } flags;
-};
 
-#endif // __TONE_ALARM_PX4_H__
+    int8_t _cont_tone_playing;
+    int8_t _tone_playing;
+    uint32_t _tone_beginning_ms;
+
+    struct Tone {
+        const char *str;
+        const uint8_t continuous : 1;
+    };
+
+    const static Tone _tones[];
+};

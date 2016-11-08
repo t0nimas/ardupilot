@@ -1,6 +1,4 @@
-/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
-
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
 
@@ -31,10 +29,9 @@ VRBRAINGPIO::VRBRAINGPIO()
 
 void VRBRAINGPIO::init()
 {
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V4) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V5) || defined(CONFIG_ARCH_BOARD_VRHERO_V1)
-    _led_fd = open(LED_DEVICE_PATH, O_RDWR);
+    _led_fd = open(LED0_DEVICE_PATH, O_RDWR);
     if (_led_fd == -1) {
-        hal.scheduler->panic("Unable to open " LED_DEVICE_PATH);
+        AP_HAL::panic("Unable to open " LED0_DEVICE_PATH);
     }
     if (ioctl(_led_fd, LED_OFF, LED_BLUE) != 0) {
         hal.console->printf("GPIO: Unable to setup GPIO LED BLUE\n");
@@ -42,40 +39,39 @@ void VRBRAINGPIO::init()
     if (ioctl(_led_fd, LED_OFF, LED_RED) != 0) {
          hal.console->printf("GPIO: Unable to setup GPIO LED RED\n");
     }
-#endif
-    _tone_alarm_fd = open("/dev/tone_alarm", O_WRONLY);
-    if (_tone_alarm_fd == -1) {
-        hal.scheduler->panic("Unable to open /dev/tone_alarm");
+    if (ioctl(_led_fd, LED_OFF, LED_GREEN) != 0) {
+         hal.console->printf("GPIO: Unable to setup GPIO LED GREEN\n");
     }
 
+    _tone_alarm_fd = open(TONEALARM0_DEVICE_PATH, O_WRONLY);
+    if (_tone_alarm_fd == -1) {
+        AP_HAL::panic("Unable to open " TONEALARM0_DEVICE_PATH);
+    }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    _gpio_fmu_fd = open(PX4FMU_DEVICE_PATH, 0);
+    if (_gpio_fmu_fd == -1) {
+        AP_HAL::panic("Unable to open GPIO");
+    }
+#ifdef GPIO_SERVO_1
+    if (ioctl(_gpio_fmu_fd, GPIO_CLEAR, GPIO_SERVO_1) != 0) {
+        hal.console->printf("GPIO: Unable to setup GPIO_1\n");
+    }
+#endif
+#ifdef GPIO_SERVO_2
+    if (ioctl(_gpio_fmu_fd, GPIO_CLEAR, GPIO_SERVO_2) != 0) {
+        hal.console->printf("GPIO: Unable to setup GPIO_2\n");
+    }
+#endif
+#ifdef GPIO_SERVO_3
+    if (ioctl(_gpio_fmu_fd, GPIO_CLEAR, GPIO_SERVO_3) != 0) {
+        hal.console->printf("GPIO: Unable to setup GPIO_3\n");
+    }
+#endif
 }
 
 void VRBRAINGPIO::pinMode(uint8_t pin, uint8_t output)
 {
     switch (pin) {
-
-
-
     }
 }
 
@@ -86,50 +82,15 @@ int8_t VRBRAINGPIO::analogPinToDigitalPin(uint8_t pin)
 
 
 uint8_t VRBRAINGPIO::read(uint8_t pin) {
-
     switch (pin) {
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#ifdef GPIO_SERVO_3
+        case EXTERNAL_RELAY1_PIN: {
+            uint32_t relays = 0;
+            ioctl(_gpio_fmu_fd, GPIO_GET, (unsigned long)&relays);
+            return (relays & GPIO_SERVO_3)?HIGH:LOW;
+        }
+#endif
 
     }
     return LOW;
@@ -139,73 +100,47 @@ void VRBRAINGPIO::write(uint8_t pin, uint8_t value)
 {
     switch (pin) {
 
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V4) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V5) || defined(CONFIG_ARCH_BOARD_VRHERO_V1)
         case HAL_GPIO_A_LED_PIN:    // Arming LED
             if (value == LOW) {
-                ioctl(_led_fd, LED_OFF, LED_RED);
+                ioctl(_led_fd, LED_OFF, LED_GREEN);
             } else {
-                ioctl(_led_fd, LED_ON, LED_RED);
+                ioctl(_led_fd, LED_ON, LED_GREEN);
             }
             break;
 
         case HAL_GPIO_B_LED_PIN:    // not used yet 
-            break;
-
-        case HAL_GPIO_C_LED_PIN:    // GPS LED 
             if (value == LOW) { 
                 ioctl(_led_fd, LED_OFF, LED_BLUE);
             } else { 
                 ioctl(_led_fd, LED_ON, LED_BLUE);
             }
             break;
-#endif
 
-        case VRBRAIN_GPIO_PIEZO_PIN:    // Piezo beeper 
-            if (value == LOW) { // this is inverted 
-                ioctl(_tone_alarm_fd, TONE_SET_ALARM, 3);    // Alarm on !! 
-                //::write(_tone_alarm_fd, &user_tune, sizeof(user_tune));
+        case HAL_GPIO_C_LED_PIN:    // GPS LED 
+            if (value == LOW) { 
+                ioctl(_led_fd, LED_OFF, LED_RED);
             } else { 
-                ioctl(_tone_alarm_fd, TONE_SET_ALARM, 0);    // Alarm off !! 
+                ioctl(_led_fd, LED_ON, LED_RED);
             }
             break;
 
+#ifdef GPIO_SERVO_1
+        case EXTERNAL_LED_GPS:
+            ioctl(_gpio_fmu_fd, value==LOW?GPIO_CLEAR:GPIO_SET, GPIO_SERVO_1);
+            break;
+#endif
 
+#ifdef GPIO_SERVO_2
+        case EXTERNAL_LED_ARMED:
+            ioctl(_gpio_fmu_fd, value==LOW?GPIO_CLEAR:GPIO_SET, GPIO_SERVO_2);
+            break;
+#endif
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#ifdef GPIO_SERVO_3
+        case EXTERNAL_RELAY1_PIN:
+            ioctl(_gpio_fmu_fd, value==LOW?GPIO_CLEAR:GPIO_SET, GPIO_SERVO_3);
+            break;
+#endif
 
 
     }
@@ -232,7 +167,13 @@ bool VRBRAINGPIO::attach_interrupt(uint8_t interrupt_num, AP_HAL::Proc p, uint8_
  */
 bool VRBRAINGPIO::usb_connected(void)
 {
-    return stm32_gpioread(GPIO_OTGFS_VBUS);
+    /*
+      we use a combination of voltage on the USB connector and the
+      open of the /dev/ttyACM0 character device. This copes with
+      systems where the VBUS may go high even with no USB connected
+      (such as AUAV-X2)
+     */
+    return stm32_gpioread(GPIO_OTGFS_VBUS) && _usb_connected;
 }
 
 

@@ -1,5 +1,3 @@
-// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
-
 // HIL_MODE SELECTION
 //
 // Mavlink supports
@@ -28,6 +26,3 @@
 
 #define HIL_PORT            3
 
-// Sensors
-// All sensors are supported in all modes.
-#define MAGNETOMETER        ENABLED
